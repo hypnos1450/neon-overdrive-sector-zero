@@ -301,8 +301,31 @@ export class AssetManager {
       shieldDome,
       shieldMat,
       droneOrbitGroup,
-      baseRing
+      baseRing,
+      hullMat,
+      armorMat,
+      coreMat: cyanEmissive,
+      visorMat: greenEmissive
     };
+  }
+
+  /**
+   * Dynamically re-colors and scales the 3D Player Mech Rig to match the chosen Chassis class.
+   */
+  applyChassisVisuals(playerRig, visuals, startingWeapons = {}) {
+    if (!playerRig || !visuals) return;
+    playerRig.armorMat.color.setHex(visuals.armorColor);
+    playerRig.hullMat.color.setHex(visuals.hullColor);
+    playerRig.coreMat.color.setHex(visuals.coreColor);
+    playerRig.visorMat.color.setHex(visuals.visorColor);
+    playerRig.baseRing.material.color.setHex(visuals.coreColor);
+    playerRig.torso.scale.set(
+      visuals.torsoScaleX || 1.0,
+      visuals.torsoScaleY || 1.0,
+      1.0
+    );
+    playerRig.missilePods.visible = Boolean(startingWeapons.missiles);
+    playerRig.railLance.visible = Boolean(startingWeapons.railgun);
   }
 
   /**

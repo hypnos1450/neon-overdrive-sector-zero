@@ -894,3 +894,254 @@ kbd {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
   will-change: transform, opacity;
 }
+
+/* ==================== MECH HANGAR & SCRAP CORE ARMORY ==================== */
+.hangar-modal {
+  max-width: 960px;
+  max-height: 94vh;
+  overflow-y: auto;
+  padding: 20px 26px;
+}
+
+.hangar-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.25);
+  padding-bottom: 10px;
+}
+
+.hangar-top-bar .game-title {
+  font-size: clamp(26px, 3.6vw, 40px);
+  line-height: 1.05;
+}
+
+.scrap-bank-box {
+  background: rgba(0, 255, 157, 0.07);
+  border: 1px solid var(--green);
+  padding: 8px 14px;
+  text-align: right;
+  min-width: 210px;
+}
+
+.scrap-bank-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+}
+
+.scrap-bank-val {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--green);
+  text-shadow: 0 0 12px var(--green-glow);
+  margin: 2px 0 6px;
+}
+
+.scrap-bank-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.hangar-section {
+  margin-bottom: 14px;
+}
+
+.hangar-section-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: var(--cyan);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hangar-preview-stats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--green);
+}
+
+.chassis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.chassis-card {
+  background: rgba(14, 20, 38, 0.88);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+
+.chassis-card:hover {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+}
+
+.chassis-card.selected {
+  border-color: var(--green);
+  background: linear-gradient(155deg, rgba(0, 255, 157, 0.14), rgba(12, 20, 38, 0.95));
+  box-shadow: 0 0 20px rgba(0, 255, 157, 0.28);
+}
+
+.chassis-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chassis-code {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.chassis-status-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--text-dim);
+}
+
+.chassis-card.selected .chassis-status-pill {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(0, 255, 157, 0.15);
+}
+
+.chassis-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+
+.chassis-stats-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--amber);
+}
+
+.chassis-weapons-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--green);
+}
+
+.chassis-passive {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.chassis-passive strong {
+  color: var(--text-main);
+}
+
+/* ARMORY GRID */
+.armory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 820px) {
+  .chassis-grid, .armory-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.armory-card {
+  background: rgba(12, 17, 32, 0.88);
+  border: 1px solid rgba(0, 212, 255, 0.26);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.armory-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.armory-name {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.armory-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.armory-pip {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--cyan);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.armory-pip.filled {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 0 6px var(--green-glow);
+}
+
+.armory-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.armory-buy-btn {
+  width: 100%;
+  background: rgba(0, 212, 255, 0.14);
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.armory-buy-btn:hover:not(:disabled) {
+  background: var(--cyan);
+  color: #040812;
+  font-weight: 700;
+}
+
+.armory-buy-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-dim);
+}
+
+.compact-legend {
+  padding: 7px 12px;
+  margin-bottom: 14px;
+}

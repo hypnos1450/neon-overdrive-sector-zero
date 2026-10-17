@@ -64,9 +64,12 @@
           <div class="threat-sub" id="hud-threat-rate">SWARM DENSITY: 1.0x</div>
         </div>
 
-        <!-- Right: Kills, Score & Quick Controls -->
+        <!-- Right: Kills, Scrap Cores & Quick Controls -->
         <div class="telemetry-box controls-box">
           <div class="telemetry-line">
+            <span class="label">SCRAP</span>
+            <span class="val green" id="hud-scrap">⚙ 0</span>
+            <span class="sep">|</span>
             <span class="label">HOSTILES PURGED</span>
             <span class="val magenta" id="hud-kills">0</span>
           </div>
@@ -109,7 +112,7 @@
       <!-- Center: Mech Integrity (HP) & Thruster Drift / EMP Dash-Parry -->
       <div class="hud-panel vitals-panel">
         <div class="mech-id-row">
-          <span class="chassis-title">VX-09 VALKYRIE</span>
+          <span class="chassis-title" id="hud-chassis-name">VX-09 VALKYRIE</span>
           <span class="parry-counter" id="hud-parry-count">EMP PARRIES: 0</span>
         </div>
 
@@ -143,49 +146,55 @@
     </footer>
   </div>
 
-  <!-- ==================== START / TITLE MODAL ==================== -->
+  <!-- ==================== MECH HANGAR & ARMORY MODAL ==================== -->
   <div id="start-modal" class="modal-overlay">
-    <div class="cyber-modal start-card">
-      <div class="glitch-badge">SECTOR ZERO // QUARANTINE PROTOCOL ACTIVE</div>
-      <h1 class="game-title">NEON <span>OVERDRIVE</span></h1>
-      <p class="game-subtitle">ISOMETRIC MECHA HORDE SURVIVAL // THREE.JS ORTHOGRAPHIC ENGINE</p>
-
-      <div class="pitch-grid">
-        <div class="pitch-feature">
-          <div class="feature-icon cyan">⚡</div>
-          <div>
-            <h3>THRUSTER DRIFT &amp; EMP DASH-PARRY</h3>
-            <p>Dash (<code>SPACE</code> / <code>SHIFT</code> / <code>RMB</code>) directly through enemy plasma bolts or charging bruisers to trigger an <strong>EMP Dash-Parry</strong>—reflecting shots at <strong>2.5x damage</strong>, stunning nearby swarms, and refunding dash energy.</p>
-          </div>
+    <div class="cyber-modal start-card hangar-modal">
+      <div class="hangar-top-bar">
+        <div>
+          <div class="glitch-badge">SECTOR ZERO // MECH HANGAR &amp; ARMORY</div>
+          <h1 class="game-title">NEON <span>OVERDRIVE</span></h1>
         </div>
-        <div class="pitch-feature">
-          <div class="feature-icon green">⚙</div>
-          <div>
-            <h3>MODULAR HARDPOINTS &amp; EVOLUTIONS</h3>
-            <p>Mount 5 distinct weapon systems (<em>Pulse Vulcan, Micro-Missiles, Tesla Orbitals, Cryo-Nova, Viper Rail-Lance</em>). Stack manufacturer tags (<code>PLASMA</code>, <code>BALLISTIC</code>, <code>CRYO</code>, <code>NANO</code>) and upgrade any weapon to <strong>LVL 5</strong> to unlock its <strong>Ultimate Evolution</strong>.</p>
-          </div>
-        </div>
-        <div class="pitch-feature">
-          <div class="feature-icon magenta">☣</div>
-          <div>
-            <h3>SYSTEM CORRUPTION OVERCLOCKS</h3>
-            <p>Accept high-voltage <strong>Glitch Overclock</strong> perks during level-ups. Raising System Corruption grants massive projectile &amp; crit multipliers while accelerating reactor threat density.</p>
+        <div class="scrap-bank-box">
+          <div class="scrap-bank-label">PERSISTENT SCRAP CORES</div>
+          <div class="scrap-bank-val" id="hangar-scrap-count">⚙ 120</div>
+          <div class="scrap-bank-actions">
+            <button id="btn-grant-scrap" class="hud-mini-btn active" title="Grant +150 Scrap Cores for Armory Testing">+150 SCRAP</button>
+            <button id="btn-refund-armory" class="hud-mini-btn" title="Refund all spent Scrap Cores">REFUND ALL</button>
           </div>
         </div>
       </div>
 
-      <div class="controls-legend">
-        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>ARROWS</kbd> 8-Way Iso Move</span>
-        <span><kbd>MOUSE</kbd> Laser Reticle Aim</span>
-        <span><kbd>SPACE</kbd> / <kbd>RMB</kbd> EMP Dash-Parry</span>
-        <span><kbd>Q</kbd> Toggle Cursor/Auto Aim</span>
-        <span><kbd>B</kbd> +200 Swarm Stress Test</span>
+      <!-- 1. Select Playable Mech Chassis -->
+      <div class="hangar-section">
+        <div class="hangar-section-title">01 // SELECT PLAYABLE MECH CHASSIS</div>
+        <div id="chassis-selector-grid" class="chassis-grid">
+          <!-- Populated dynamically from CHASSIS_DEFS -->
+        </div>
+      </div>
+
+      <!-- 2. Persistent Scrap Core Armory -->
+      <div class="hangar-section">
+        <div class="hangar-section-title">
+          <span>02 // PERSISTENT ARMORY META-UPGRADES (AUTO-SAVED TO LOCALSTORAGE)</span>
+          <span id="hangar-combined-stats" class="hangar-preview-stats"></span>
+        </div>
+        <div id="armory-grid" class="armory-grid">
+          <!-- Populated dynamically from ARMORY_UPGRADES -->
+        </div>
+      </div>
+
+      <div class="controls-legend compact-legend">
+        <span><kbd>WASD</kbd>/<kbd>ARROWS</kbd> 8-Way Iso Move</span>
+        <span><kbd>MOUSE</kbd> Aim</span>
+        <span><kbd>SPACE</kbd>/<kbd>RMB</kbd> EMP Dash-Parry</span>
+        <span><kbd>Q</kbd> Cursor/Auto Aim</span>
+        <span><kbd>B</kbd> +200 Swarm Surge</span>
         <span><kbd>ESC</kbd> Pause</span>
       </div>
 
       <div class="start-actions">
         <button id="btn-start-game" class="cyber-btn primary-btn">
-          INITIALIZE DROP // LAUNCH VX-09 VALKYRIE
+          INITIALIZE DROP // LAUNCH <span id="btn-launch-chassis-name">VX-09 VALKYRIE</span>
         </button>
       </div>
     </div>
@@ -237,18 +246,19 @@
           <span class="stat-val cyan" id="stat-parries">0</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">SYSTEM CORRUPTION</span>
-          <span class="stat-val magenta" id="stat-corruption">0%</span>
+          <span class="stat-label">SCRAP BANKED</span>
+          <span class="stat-val green" id="stat-scrap">⚙ 0</span>
         </div>
         <div class="stat-item">
           <span class="stat-label">PEAK DPS OUTPUT</span>
-          <span class="stat-val green" id="stat-damage">0</span>
+          <span class="stat-val magenta" id="stat-damage">0</span>
         </div>
       </div>
 
       <div class="end-actions">
         <button id="btn-resume-game" class="cyber-btn secondary-btn hidden">RESUME COMBAT [ESC]</button>
-        <button id="btn-restart-game" class="cyber-btn primary-btn">REBOOT CHASSIS // NEW RUN</button>
+        <button id="btn-open-hangar" class="cyber-btn secondary-btn">MECH HANGAR &amp; ARMORY</button>
+        <button id="btn-restart-game" class="cyber-btn primary-btn">QUICK REBOOT // NEW RUN</button>
       </div>
     </div>
   </div>

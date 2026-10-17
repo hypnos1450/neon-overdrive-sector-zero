@@ -4,6 +4,7 @@ import { AssetManager } from './assets.js';
 import { SpatialHashGrid } from './spatialGrid.js';
 import { VFXManager } from './vfx.js';
 import { WEAPON_DEFS, PASSIVE_DEFS, SYNERGY_INFO, UpgradeSystem } from './upgrades.js';
+import { CHASSIS_DEFS, ARMORY_UPGRADES, MetaProgression } from './meta.js';
 
 // ==================== ENGINE CONSTANTS ====================
 const ARENA_HALF_SIZE = 62;
@@ -30,6 +31,7 @@ class NeonOverdriveGame {
     this.audio = new SoundEngine();
     this.assets = new AssetManager();
     this.spatialGrid = new SpatialHashGrid(4.0);
+    this.meta = new MetaProgression();
 
     // Game State
     this.state = 'MENU'; // 'MENU' | 'PLAYING' | 'LEVEL_UP' | 'PAUSED' | 'GAME_OVER'
@@ -65,6 +67,7 @@ class NeonOverdriveGame {
     this._initInstancedPools();
     this._initPlayerState();
     this._bindEvents();
+    this.renderHangarUI();
     this._startLoop();
   }
 
@@ -323,84 +326,87 @@ class NeonOverdriveGame {
   }
 
   _initPlayerState() {
+    const start = this.meta.computeStartingStats();
+
     this.player = {
+      chassisId: start.chassisId,
+      chassisCode: start.chassisCode,
       x: 0,
       z: 0,
       vx: 0,
       vz: 0,
       aimAngle: 0,
       walkCycle: 0,
-      radius: 0.75,
+      radius: start.chassisId === 'titan' ? 0.9 : 0.75,
 
       // Vitals & Leveling
-      hp: 120,
-      maxHp: 120,
-      hpRegen: 0.5,
+      hp: start.maxHp,
+      maxHp: start.maxHp,
+      hpRegen: start.hpRegen,
       level: 1,
       xp: 0,
       xpToNext: 80,
-      xpMultiplier: 1.0,
-      pickupRadius: 4.5,
+      xpMultiplier: start.xpMultiplier,
+      pickupRadius: start.pickupRadius,
 
       // Movement & EMP Dash-Parry
-      moveSpeed: 9.8,
-      dashCharges: 2,
-      maxDashCharges: 2,
-      dashCooldown: 2.2,
+      moveSpeed: start.moveSpeed,
+      dashCharges: start.dashCharges,
+      maxDashCharges: start.maxDashCharges,
+      dashCooldown: start.dashCooldown,
       dashRechargeTimer: 0,
       dashActiveTimer: 0,
       dashDirX: 0,
       dashDirZ: 1,
       iFrameTimer: 0,
-      parryRadius: 2.75,
-      parryDamageMultiplier: 2.5,
-      parryHeal: 0,
+      parryRadius: start.parryRadius,
+      parryDamageMultiplier: start.parryDamageMultiplier,
+      parryHeal: start.parryHeal,
       parryCount: 0,
       overdriveHasteTimer: 0,
 
       // Combat Multipliers
-      damageMultiplier: 1.0,
-      fireRateMultiplier: 1.0,
-      critChance: 0.12,
-      critMultiplier: 1.85,
+      damageMultiplier: start.damageMultiplier,
+      fireRateMultiplier: start.fireRateMultiplier,
+      critChance: start.critChance,
+      critMultiplier: start.critMultiplier,
       bonusProjectiles: 0,
       corruption: 0,
 
       // Synergies
-      tagCounts: { PLASMA: 1, BALLISTIC: 1, CRYO: 0, NANO: 0 },
+      tagCounts: { ...start.startingTags },
       synergyDamageBonus: 1.0,
       synergyProjSpeedBonus: 1.0,
       synergyCryoBonus: 1.0,
 
       // Hardpoints & Passives
-      weapons: {
-        vulcan: 1,
-        missiles: 0,
-        drone: 0,
-        cryo: 0,
-        railgun: 0
-      },
+      weapons: { ...start.startingWeapons },
       passives: {},
       corruptedPerks: {},
 
       // Weapon Cooldown Timers
       timers: {
         vulcan: 0,
-        missiles: 0,
-        droneArc: 0,
-        cryo: 0,
-        railgun: 0
+        missiles: 0.4,
+        droneArc: 0.4,
+        cryo: 0.8,
+        railgun: 0.6
       },
 
       // Telemetry
       kills: 0,
+      scrapEarnedThisRun: 0,
       totalDamageDealt: 0,
       gemCombo: 0,
       gemComboTimer: 0
     };
 
+    this.rerollsLeft = start.rerolls;
     this.upgradeSystem = new UpgradeSystem(this.player);
     this.droneMeshes = [];
+
+    // Apply 3D Chassis visual theme & mounted hardpoints
+    this.assets.applyChassisVisuals(this.playerRig, start.visuals, start.startingWeapons);
 
     // Wave / Horde Director State
     this.wave = {
@@ -435,9 +441,15 @@ class NeonOverdriveGame {
       this.gemMesh.setMatrixAt(i, this._mat4);
     }
 
+    this.enemyShadowMesh.count = 0;
     this.enemyShadowMesh.instanceMatrix.needsUpdate = true;
-    for (const im of this.enemyArchetypeMeshes) im.instanceMatrix.needsUpdate = true;
+    for (const im of this.enemyArchetypeMeshes) {
+      im.count = 0;
+      im.instanceMatrix.needsUpdate = true;
+    }
+    this.projectileMesh.count = 0;
     this.projectileMesh.instanceMatrix.needsUpdate = true;
+    this.gemMesh.count = 0;
     this.gemMesh.instanceMatrix.needsUpdate = true;
 
     // Clear Drone meshes
@@ -445,18 +457,93 @@ class NeonOverdriveGame {
       this.playerRig.droneOrbitGroup.remove(dm);
     }
     this.droneMeshes.length = 0;
-    this.playerRig.missilePods.visible = false;
-    this.playerRig.railLance.visible = false;
 
     this._initPlayerState();
     this.elapsedTime = 0;
-    this.rerollsLeft = 2;
     this.playerRig.root.position.set(0, 0, 0);
     this.cameraTarget.set(0, 0, 0);
 
     // Spawn initial perimeter wave so action begins immediately
     this.spawnWaveBurst(28, false);
     this.updateHUD();
+  }
+
+  renderHangarUI() {
+    const start = this.meta.computeStartingStats();
+    this.assets.applyChassisVisuals(this.playerRig, start.visuals, start.startingWeapons);
+
+    document.getElementById('hangar-scrap-count').textContent = `⚙ ${this.meta.data.scrapCores}`;
+    document.getElementById('btn-launch-chassis-name').textContent = start.chassisCode;
+    document.getElementById('hangar-combined-stats').textContent =
+      `ACTIVE LOADOUT: ${start.maxHp} HP | ${start.moveSpeed} SPD | ${Math.round(start.damageMultiplier * 100)}% DMG | ${Math.round(start.critChance * 100)}% CRIT | ${start.rerolls} REROLLS`;
+
+    // 1. Render 3 Playable Mech Chassis Cards
+    const chassisGrid = document.getElementById('chassis-selector-grid');
+    chassisGrid.innerHTML = '';
+    for (const key of Object.keys(CHASSIS_DEFS)) {
+      const c = CHASSIS_DEFS[key];
+      const isSelected = this.meta.data.selectedChassis === key;
+      const card = document.createElement('div');
+      card.className = `chassis-card ${isSelected ? 'selected' : ''}`;
+      card.innerHTML = `
+        <div class="chassis-card-header">
+          <span class="chassis-code">${c.code}</span>
+          <span class="chassis-status-pill">${isSelected ? '✓ DEPLOYED' : 'SELECT'}</span>
+        </div>
+        <div class="chassis-role">${c.role}</div>
+        <div class="chassis-weapons-line">⚙ ${c.weaponsLabel}</div>
+        <div class="chassis-stats-line">${c.statsLabel}</div>
+        <div class="chassis-passive"><strong>${c.passiveTitle}:</strong> ${c.passiveDesc}</div>
+      `;
+      card.addEventListener('click', () => {
+        this.audio.init();
+        this.meta.selectChassis(key);
+        this.audio.playDash();
+        this.renderHangarUI();
+      });
+      chassisGrid.appendChild(card);
+    }
+
+    // 2. Render 6 Persistent Armory Meta-Upgrade Cards
+    const armoryGrid = document.getElementById('armory-grid');
+    armoryGrid.innerHTML = '';
+    for (const def of ARMORY_UPGRADES) {
+      const tier = this.meta.getUpgradeTier(def.id);
+      const cost = this.meta.getUpgradeCost(def);
+      const isMax = tier >= def.maxTier;
+      const canAfford = !isMax && this.meta.data.scrapCores >= cost;
+
+      let pipsHtml = '';
+      for (let i = 0; i < def.maxTier; i++) {
+        pipsHtml += `<div class="armory-pip ${i < tier ? 'filled' : ''}"></div>`;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'armory-card';
+      card.innerHTML = `
+        <div>
+          <div class="armory-top">
+            <span class="armory-name">${def.icon} ${def.name}</span>
+            <div class="armory-pips">${pipsHtml}</div>
+          </div>
+          <div class="armory-desc">${def.descPerTier}</div>
+        </div>
+        <button class="armory-buy-btn" ${!canAfford ? 'disabled' : ''}>
+          ${isMax ? 'MAX TIER REACHED' : `UPGRADE TIER ${tier + 1} // ⚙ ${cost}`}
+        </button>
+      `;
+
+      const btn = card.querySelector('.armory-buy-btn');
+      btn.addEventListener('click', () => {
+        this.audio.init();
+        if (this.meta.buyUpgrade(def.id)) {
+          this.audio.playLevelUp();
+          this.renderHangarUI();
+        }
+      });
+
+      armoryGrid.appendChild(card);
+    }
   }
 
   _bindEvents() {
@@ -516,12 +603,34 @@ class NeonOverdriveGame {
       this.state = 'PLAYING';
     });
 
+    document.getElementById('btn-grant-scrap').addEventListener('click', () => {
+      this.audio.init();
+      this.meta.data.scrapCores += 150;
+      this.meta.save();
+      this.audio.playGemPickup(6);
+      this.renderHangarUI();
+    });
+
+    document.getElementById('btn-refund-armory').addEventListener('click', () => {
+      this.audio.init();
+      this.meta.refundAllUpgrades();
+      this.audio.playDash();
+      this.renderHangarUI();
+    });
+
     document.getElementById('btn-aim-mode').addEventListener('click', () => this.toggleAimMode());
     document.getElementById('btn-swarm-surge').addEventListener('click', () => this.triggerSwarmSurge(200));
     document.getElementById('btn-audio-toggle').addEventListener('click', () => this.toggleAudio());
     document.getElementById('btn-reroll').addEventListener('click', () => this.rerollUpgrades());
 
     document.getElementById('btn-resume-game').addEventListener('click', () => this.resumeGame());
+    document.getElementById('btn-open-hangar').addEventListener('click', () => {
+      document.getElementById('gameover-modal').classList.add('hidden');
+      document.getElementById('hud').classList.add('hidden');
+      this.renderHangarUI();
+      document.getElementById('start-modal').classList.remove('hidden');
+      this.state = 'MENU';
+    });
     document.getElementById('btn-restart-game').addEventListener('click', () => {
       document.getElementById('gameover-modal').classList.add('hidden');
       this.resetRun();
@@ -651,11 +760,11 @@ class NeonOverdriveGame {
       }
     }
 
-    // 2. Also allow Dash-Parry when dashing directly through an enemy Sniper/Bruiser/Bomber/Boss
+    // 2. Also allow Dash-Parry when dashing directly through an enemy (or any Swarmer if playing KR-77 TITAN)
     const nearbyEnemies = this.spatialGrid.queryRadius(p.x, p.z, p.parryRadius * 0.85, this._queryBuffer);
     for (let i = 0; i < nearbyEnemies.length; i++) {
       const e = nearbyEnemies[i];
-      if (e.stunTimer <= 0 && (e.type >= 1 || parriedCount > 0)) {
+      if (e.stunTimer <= 0 && (e.type >= 1 || p.chassisId === 'titan' || parriedCount > 0)) {
         parriedCount++;
         break;
       }
@@ -669,10 +778,12 @@ class NeonOverdriveGame {
   _executeEmpParryBlast(parriedCount) {
     const p = this.player;
     p.parryCount += parriedCount;
+    const scrapGained = this.meta.addScrap(2);
+    p.scrapEarnedThisRun += scrapGained;
 
-    // Refund 45% of a dash charge & grant brief overdrive fire-rate haste
+    // Refund a dash charge & grant brief overdrive fire-rate haste
     p.dashCharges = Math.min(p.maxDashCharges, p.dashCharges + 1);
-    p.overdriveHasteTimer = 3.0;
+    p.overdriveHasteTimer = 3.2;
 
     if (p.parryHeal > 0) {
       p.hp = Math.min(p.maxHp, p.hp + p.parryHeal);
@@ -703,7 +814,7 @@ class NeonOverdriveGame {
       p.x,
       2.4,
       p.z,
-      `⚡ EMP DASH-PARRY!`,
+      `⚡ EMP PARRY! +⚙${scrapGained}`,
       '#00ff9d',
       1.35,
       0.85
@@ -1742,12 +1853,19 @@ class NeonOverdriveGame {
         this.hitStopTimer = 0.06;
         this.screenShake = Math.max(this.screenShake, 0.7);
         this.vfx.spawnShockwave(enemy.x, enemy.z, 0xff1e6b, 9.0, 0.55);
+        const bossScrap = this.meta.addScrap(25);
+        this.player.scrapEarnedThisRun += bossScrap;
+        this.vfx.spawnFloatingText(enemy.x, 2.6, enemy.z, `+⚙${bossScrap} BOSS SCRAP!`, '#00ff9d', 1.4, 1.1);
         // Drop Vacuum Overdrive Core + Heal Core
         this.spawnGem(enemy.x, enemy.z, enemy.xpValue, true, true);
         if (this.player.parryHeal > 0) {
           this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.parryHeal);
         }
       } else {
+        if (Math.random() < 0.22) {
+          const s = this.meta.addScrap(enemy.type >= 1 ? 2 : 1);
+          this.player.scrapEarnedThisRun += s;
+        }
         this.spawnGem(enemy.x, enemy.z, enemy.xpValue, false, Math.random() < 0.025);
       }
     }
@@ -1991,6 +2109,8 @@ class NeonOverdriveGame {
     document.getElementById('hud-fps').textContent = this.currentFps;
     document.getElementById('hud-entities').textContent = this.wave.activeEnemiesCount;
     document.getElementById('hud-kills').textContent = p.kills;
+    document.getElementById('hud-scrap').textContent = `⚙ ${this.meta.data.scrapCores}`;
+    document.getElementById('hud-chassis-name').textContent = p.chassisCode;
     document.getElementById('hud-parry-count').textContent = `EMP PARRIES: ${p.parryCount}`;
 
     // HP Bar
@@ -2082,7 +2202,7 @@ class NeonOverdriveGame {
     this.state = 'GAME_OVER';
     this._populateEndModal(
       'CHASSIS CRITICAL FAILURE',
-      'VX-09 Valkyrie overwhelmed in Sector Zero.',
+      `${this.player.chassisCode} overwhelmed in Sector Zero. Earned +⚙${this.player.scrapEarnedThisRun} Scrap Cores.`,
       false
     );
   }
@@ -2099,7 +2219,7 @@ class NeonOverdriveGame {
     document.getElementById('stat-level').textContent = p.level;
     document.getElementById('stat-kills').textContent = p.kills;
     document.getElementById('stat-parries').textContent = p.parryCount;
-    document.getElementById('stat-corruption').textContent = `${p.corruption}%`;
+    document.getElementById('stat-scrap').textContent = `⚙ ${this.meta.data.scrapCores} (+${p.scrapEarnedThisRun})`;
     const dps = this.elapsedTime > 1 ? Math.round(p.totalDamageDealt / this.elapsedTime) : 0;
     document.getElementById('stat-damage').textContent = `${dps.toLocaleString()} /s`;
 
