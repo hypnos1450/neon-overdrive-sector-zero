@@ -1,0 +1,17 @@
+{
+  "name": "neon-overdrive-sector-zero",
+  "version": "1.0.0",
+  "description": "Production-grade 3D Isometric Horde Survival ARPG in Three.js - Neon Overdrive: Sector Zero",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.164.1"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

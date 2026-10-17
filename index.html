@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NEON OVERDRIVE: SECTOR ZERO // 3D Isometric Mecha Horde Survival</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><polygon points='32,4 58,18 58,46 32,60 6,46 6,18' fill='%23070810' stroke='%2300d4ff' stroke-width='4'/><polygon points='20,26 44,26 40,38 24,38' fill='%2300ff9d'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Floating Combat Text & World-Space Telemetry Layer -->
+  <div id="fct-container" aria-hidden="true"></div>
+
+  <!-- Screen-Edge Vignette & Damage/Corruption Flash Overlay -->
+  <div id="screen-fx" aria-hidden="true"></div>
+  <div id="scanline-overlay" aria-hidden="true"></div>
+
+  <!-- ==================== IN-GAME HUD ==================== -->
+  <div id="hud" class="hidden">
+    <!-- Top Bar: XP Progress, Wave Timer, Kill Count, Performance Telemetry -->
+    <header class="hud-top">
+      <div class="xp-bar-wrapper">
+        <div class="xp-bar-fill" id="xp-bar-fill"></div>
+        <div class="xp-bar-Text">
+          <span class="level-badge" id="hud-level">LVL 01</span>
+          <span class="xp-numbers" id="hud-xp-text">DATA SHARDS: 0 / 100</span>
+        </div>
+      </div>
+
+      <div class="top-telemetry-row">
+        <!-- Left: Performance & Asset Status -->
+        <div class="telemetry-box perf-box">
+          <div class="telemetry-line">
+            <span class="label">FPS</span>
+            <span class="val cyan" id="hud-fps">60</span>
+            <span class="sep">|</span>
+            <span class="label">ENTITIES</span>
+            <span class="val green" id="hud-entities">0</span>
+          </div>
+          <div class="telemetry-line small">
+            <span class="label">PIPELINE:</span>
+            <span class="val" id="hud-asset-status">HYBRID GLTF + INSTANCED RIG</span>
+          </div>
+        </div>
+
+        <!-- Center: Sector Wave & Survival Clock -->
+        <div class="clock-panel">
+          <div class="wave-tag" id="hud-wave-name">WAVE 01 // CONTAINMENT BREACH</div>
+          <div class="survival-clock" id="hud-timer">00:00</div>
+          <div class="threat-sub" id="hud-threat-rate">SWARM DENSITY: 1.0x</div>
+        </div>
+
+        <!-- Right: Kills, Score & Quick Controls -->
+        <div class="telemetry-box controls-box">
+          <div class="telemetry-line">
+            <span class="label">HOSTILES PURGED</span>
+            <span class="val magenta" id="hud-kills">0</span>
+          </div>
+          <div class="hud-action-buttons">
+            <button id="btn-aim-mode" class="hud-mini-btn active" title="Toggle Primary Cannon Aim Mode (Q)">
+              [Q] AIM: CURSOR
+            </button>
+            <button id="btn-swarm-surge" class="hud-mini-btn surge" title="Spawn +200 Swarmers for 500+ Entity Stress Test (B)">
+              [B] +200 SWARM SURGE
+            </button>
+            <button id="btn-audio-toggle" class="hud-mini-btn active" title="Toggle Synth Audio & Music (M)">
+              [M] AUDIO: ON
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Boss Health Bar -->
+      <div id="boss-bar-container" class="boss-bar-container hidden">
+        <div class="boss-header">
+          <span class="boss-warning">⚠ ELITE SIEGE CONSTRUCT DETECTED</span>
+          <span class="boss-name" id="boss-name">APEX DREADNOUGHT MK-IV</span>
+        </div>
+        <div class="boss-hp-track">
+          <div class="boss-hp-fill" id="boss-hp-fill"></div>
+          <span class="boss-hp-text" id="boss-hp-text">2500 / 2500</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Bottom HUD: Left = Hardpoint Chassis & Synergies, Center = Mech Vitals & Dash-Parry, Right = System Corruption -->
+    <footer class="hud-bottom">
+      <!-- Left: Modular Hardpoints & Manufacturer Synergies -->
+      <div class="hud-panel hardpoints-panel">
+        <div class="panel-title">CHASSIS HARDPOINTS &amp; MODULES</div>
+        <div class="hardpoint-slots" id="hud-weapons-list"></div>
+        <div class="synergy-row" id="hud-synergies-list"></div>
+      </div>
+
+      <!-- Center: Mech Integrity (HP) & Thruster Drift / EMP Dash-Parry -->
+      <div class="hud-panel vitals-panel">
+        <div class="mech-id-row">
+          <span class="chassis-title">VX-09 VALKYRIE</span>
+          <span class="parry-counter" id="hud-parry-count">EMP PARRIES: 0</span>
+        </div>
+
+        <div class="hp-bar-outer">
+          <div class="hp-bar-fill" id="hud-hp-fill"></div>
+          <span class="hp-bar-label" id="hud-hp-text">HULL INTEGRITY: 100 / 100</span>
+        </div>
+
+        <div class="dash-bar-row">
+          <div class="dash-pips" id="hud-dash-pips">
+            <div class="dash-pip ready"><div class="dash-pip-fill"></div></div>
+            <div class="dash-pip ready"><div class="dash-pip-fill"></div></div>
+          </div>
+          <span class="dash-hint">[SPACE / SHIFT / RMB] HYPER-DASH &amp; EMP PARRY</span>
+        </div>
+      </div>
+
+      <!-- Right: System Corruption Meter & Active Overclocks -->
+      <div class="hud-panel corruption-panel">
+        <div class="panel-title corruption-title">
+          <span>SYSTEM CORRUPTION</span>
+          <span id="hud-corruption-pct">0%</span>
+        </div>
+        <div class="corruption-meter-track">
+          <div class="corruption-meter-fill" id="hud-corruption-fill"></div>
+        </div>
+        <div class="corruption-effects" id="hud-corruption-desc">
+          STATUS: NOMINAL // ACCEPT GLITCH OVERCLOCKS TO AMPLIFY COMBAT OUTPUT
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ==================== START / TITLE MODAL ==================== -->
+  <div id="start-modal" class="modal-overlay">
+    <div class="cyber-modal start-card">
+      <div class="glitch-badge">SECTOR ZERO // QUARANTINE PROTOCOL ACTIVE</div>
+      <h1 class="game-title">NEON <span>OVERDRIVE</span></h1>
+      <p class="game-subtitle">ISOMETRIC MECHA HORDE SURVIVAL // THREE.JS ORTHOGRAPHIC ENGINE</p>
+
+      <div class="pitch-grid">
+        <div class="pitch-feature">
+          <div class="feature-icon cyan">⚡</div>
+          <div>
+            <h3>THRUSTER DRIFT &amp; EMP DASH-PARRY</h3>
+            <p>Dash (<code>SPACE</code> / <code>SHIFT</code> / <code>RMB</code>) directly through enemy plasma bolts or charging bruisers to trigger an <strong>EMP Dash-Parry</strong>—reflecting shots at <strong>2.5x damage</strong>, stunning nearby swarms, and refunding dash energy.</p>
+          </div>
+        </div>
+        <div class="pitch-feature">
+          <div class="feature-icon green">⚙</div>
+          <div>
+            <h3>MODULAR HARDPOINTS &amp; EVOLUTIONS</h3>
+            <p>Mount 5 distinct weapon systems (<em>Pulse Vulcan, Micro-Missiles, Tesla Orbitals, Cryo-Nova, Viper Rail-Lance</em>). Stack manufacturer tags (<code>PLASMA</code>, <code>BALLISTIC</code>, <code>CRYO</code>, <code>NANO</code>) and upgrade any weapon to <strong>LVL 5</strong> to unlock its <strong>Ultimate Evolution</strong>.</p>
+          </div>
+        </div>
+        <div class="pitch-feature">
+          <div class="feature-icon magenta">☣</div>
+          <div>
+            <h3>SYSTEM CORRUPTION OVERCLOCKS</h3>
+            <p>Accept high-voltage <strong>Glitch Overclock</strong> perks during level-ups. Raising System Corruption grants massive projectile &amp; crit multipliers while accelerating reactor threat density.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-legend">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>ARROWS</kbd> 8-Way Iso Move</span>
+        <span><kbd>MOUSE</kbd> Laser Reticle Aim</span>
+        <span><kbd>SPACE</kbd> / <kbd>RMB</kbd> EMP Dash-Parry</span>
+        <span><kbd>Q</kbd> Toggle Cursor/Auto Aim</span>
+        <span><kbd>B</kbd> +200 Swarm Stress Test</span>
+        <span><kbd>ESC</kbd> Pause</span>
+      </div>
+
+      <div class="start-actions">
+        <button id="btn-start-game" class="cyber-btn primary-btn">
+          INITIALIZE DROP // LAUNCH VX-09 VALKYRIE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LEVEL UP / HARDPOINT SYNTHESIS MODAL ==================== -->
+  <div id="levelup-modal" class="modal-overlay hidden">
+    <div class="cyber-modal levelup-card">
+      <div class="levelup-header">
+        <div class="glitch-badge">DATA SHARD THRESHOLD REACHED</div>
+        <h2 id="levelup-title">HARDPOINT UPGRADE // SELECT MODULE</h2>
+        <p id="levelup-subtitle">Choose 1 of 3 tactical cyber-augmentations or accept a high-risk Glitch Overclock.</p>
+      </div>
+
+      <div id="upgrade-cards-container" class="upgrade-cards-grid">
+        <!-- Dynamically populated with 3 Perk Cards -->
+      </div>
+
+      <div class="levelup-footer">
+        <button id="btn-reroll" class="cyber-btn secondary-btn">
+          [R] RECALIBRATE MATRIX (REROLLS LEFT: <span id="reroll-count">2</span>)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAUSE / GAME OVER MODAL ==================== -->
+  <div id="gameover-modal" class="modal-overlay hidden">
+    <div class="cyber-modal gameover-card">
+      <div class="glitch-badge" id="end-badge">REACTOR TELEMETRY LOG</div>
+      <h2 id="end-title">CHASSIS CRITICAL FAILURE</h2>
+      <p id="end-subtitle">VX-09 Valkyrie offline in Sector Zero.</p>
+
+      <div class="stats-grid" id="end-stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">SURVIVAL TIME</span>
+          <span class="stat-val cyan" id="stat-time">00:00</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">CHASSIS LEVEL</span>
+          <span class="stat-val green" id="stat-level">1</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">HOSTILES PURGED</span>
+          <span class="stat-val magenta" id="stat-kills">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">EMP DASH-PARRIES</span>
+          <span class="stat-val cyan" id="stat-parries">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">SYSTEM CORRUPTION</span>
+          <span class="stat-val magenta" id="stat-corruption">0%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">PEAK DPS OUTPUT</span>
+          <span class="stat-val green" id="stat-damage">0</span>
+        </div>
+      </div>
+
+      <div class="end-actions">
+        <button id="btn-resume-game" class="cyber-btn secondary-btn hidden">RESUME COMBAT [ESC]</button>
+        <button id="btn-restart-game" class="cyber-btn primary-btn">REBOOT CHASSIS // NEW RUN</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
